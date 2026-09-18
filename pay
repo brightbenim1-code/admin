@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pay Fees - BENIM PREPARATORY ACADEMY</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://js.paystack.co/v1/inline.js"></script>
+<style>
+:root{--blue:#0756a6;--blue-dark:#063b75;--green:#16a34a;--bg:#f4f8fc;--border:#dce6f0;--text:#10233f;--muted:#64748b}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif}body{background:var(--bg)}
+.topbar{background:linear-gradient(135deg,var(--blue-dark),var(--blue));color:white;padding:15px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:4px solid var(--green)}
+.container{max-width:560px;margin:24px auto;padding:0 16px}.card{background:white;border:1px solid var(--border);border-radius:18px;padding:22px;box-shadow:0 5px 18px rgba(7,86,166,.06)}
+.input{width:100%;padding:13px;border:1.5px solid var(--border);border-radius:11px;outline:none;margin-top:8px}
+.btn{padding:13px;border:none;border-radius:11px;font-weight:800;cursor:pointer;width:100%}.btn-primary{background:var(--blue);color:white}.btn-yellow{background:#f9b233;color:#10233f}
+.badge{padding:6px 12px;border-radius:999px;font-size:11px;font-weight:800}.badge-paid{background:#dcfce7;color:#166534}.badge-unpaid{background:#fee2e2;color:#991b1b}.badge-part{background:#fff7ed;color:#9a3412}
+.pay-opt{border:1.5px solid var(--border);border-radius:12px;padding:12px;text-align:center;font-weight:700;cursor:pointer;font-size:13px}.pay-opt.active{border-color:var(--blue);background:#eaf3ff}
+</style>
+</head>
+<body>
+<div class="topbar">
+<div style="display:flex;gap:12px;align-items:center"><div style="width:42px;height:42px;background:white;color:var(--blue);border-radius:12px;display:grid;place-items:center;font-weight:800">B</div><div><div style="font-weight:800">BENIM PREPARATORY ACADEMY</div><div style="font-size:10px;opacity:.9">PERSONAL FEES PAYMENT</div></div></div>
+<div style="font-size:11px">Secure Pay</div>
+</div>
+<div class="container">
+<div class="card" id="lookupCard">
+<h2 style="color:var(--blue-dark)">Pay School Fees</h2>
+<p style="font-size:13px;color:var(--muted);margin:8px 0 16px 0">Enter your Student ID. If you came from personal link, it will load automatically.</p>
+<label style="font-size:13px;font-weight:700">Student ID</label>
+<input class="input" id="studentID" placeholder="e.g BPA/001">
+<button class="btn btn-primary" style="margin-top:14px" onclick="lookup()">View My Fees</button>
+<div id="error" style="color:#dc2626;font-size:12px;margin-top:10px"></div>
+</div>
+<div id="studentCard" style="display:none"></div>
+<div id="receiptArea"></div>
+</div>
+<script>
+let students = JSON.parse(localStorage.getItem("BENIM_STUDENTS") || "[]");
+let current = null;
+let selectedMethod = "MTN MoMo";
+function saveDB(){
+  const unique = {}; students.forEach(s => { unique[s.id] = s; });
+  students = Object.values(unique);
+  localStorage.setItem("BENIM_STUDENTS", JSON.stringify(students));
+}
+function getIdFromUrl(){ const params = new URLSearchParams(window.location.search); return params.get('id'); }
+function lookup(idParam){
+  const idInput = (idParam || document.getElementById('studentID').value.trim().toUpperCase());
+  if(!idInput){ document.getElementById('error').innerText="Enter Student ID"; return; }
+  const s = students.find(x=>x.id.toUpperCase()===idInput.toUpperCase());
+  if(!s){ document.getElementById('error').innerHTML = "ID <b>"+idInput+"</b> not found. For demo try BPA/001"; return; }
+  current = s;
+  document.getElementById('lookupCard').style.display='none';
+  let statusText = s.balance===0 ? "FULLY PAID" : s.paid>0 ? "BALANCE: GHS "+Number(s.balance).toFixed(2) : "UNPAID";
+  let badgeClass = s.balance===0 ? "badge-paid" : s.paid>0 ? "badge-part" : "badge-unpaid";
+  document.getElementById('studentCard').style.display='block';
+  document.getElementById('studentCard').innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:start"><div><div style="font-weight:800;font-size:20px;color:var(--blue-dark)">${s.name}</div><div style="font-size:13px;color:var(--muted)">${s.id} • ${s.class} • ${s.academicYear}</div><div style="font-size:12px;color:var(--muted);margin-top:4px">Parent: ${s.parent} | ${s.email}</div></div><span class="badge ${badgeClass}">${statusText}</span></div>
+      <div style="margin-top:18px;background:#f8fafc;border:1px solid var(--border);border-radius:14px;padding:14px">
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed var(--border);font-size:13px"><span>Total Fees</span><b>GHS ${Number(s.total).toFixed(2)}</b></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed var(--border);font-size:13px"><span>Total Paid</span><b style="color:var(--green)">GHS ${Number(s.paid).toFixed(2)}</b></div>
+        <div style="display:flex;justify-content:space-between;padding:12px 0;font-size:18px;font-weight:800"><span>Amount Due</span><b style="color:#dc2626">GHS ${Number(s.balance).toFixed(2)}</b></div>
+      </div>
+      <div id="paySection" style="${s.balance===0?'display:none':''}">
+        <div style="margin-top:18px"><label style="font-size:13px;font-weight:700">How much to pay? (GHS)</label><input class="input" type="number" id="payAmount" value="${Number(s.balance).toFixed(2)}" oninput="document.getElementById('payBtnText').innerText='Pay GHS '+this.value+' Now'"></div>
+        <div style="display:flex;gap:8px;margin-top:10px"><button onclick="setAmount(50)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:12px;cursor:pointer">Pay 50%</button><button onclick="setAmount(100)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:12px;cursor:pointer">Pay Full</button></div>
+        <label style="font-size:13px;font-weight:700;margin-top:16px;display:block">Payment Method</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px"><div class="pay-opt active" onclick="pick(this,'MTN MoMo')">MTN<br>MoMo</div><div class="pay-opt" onclick="pick(this,'Telecel Cash')">Telecel<br>Cash</div><div class="pay-opt" onclick="pick(this,'Card / Bank')">Card</div></div>
+        <label style="font-size:13px;font-weight:700;margin-top:14px;display:block">Your Email for Receipt</label><input class="input" id="receiptEmail" type="email" value="${s.email}" placeholder="parent@gmail.com">
+        <button class="btn btn-yellow" style="margin-top:16px" onclick="payNow()"><span id="payBtnText">Pay GHS ${Number(s.balance).toFixed(2)} Now</span></button>
+        <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px">🔒 Secure by Paystack - MoMo prompt will come</p>
+      </div>
+      <div id="paidMsg" style="${s.balance===0?'':'display:none'};text-align:center;padding:20px;background:#dcfce7;border-radius:12px;margin-top:16px"><div style="font-size:32px">✓</div><div style="font-weight:800;color:#166534">Fully Paid - No Balance</div></div>
+      <button class="btn" style="margin-top:12px;background:#f1f5f9;font-size:12px" onclick="viewHistory()">View Payment History</button><div id="history"></div>
+    </div>`;
+}
+function setAmount(pct){ if(!current) return; const v = (Number(current.balance) * pct/100).toFixed(2); document.getElementById('payAmount').value=v; document.getElementById('payBtnText').innerText='Pay GHS '+v+' Now'; }
+function pick(el, method){ document.querySelectorAll('.pay-opt').forEach(o=>o.classList.remove('active')); el.classList.add('active'); selectedMethod=method; }
+function payNow(){
+  const amt = Number(document.getElementById('payAmount').value);
+  const email = document.getElementById('receiptEmail').value.trim();
+  if(!amt || amt<=0) return alert("Enter valid amount");
+  if(amt > Number(current.balance)) return alert("Amount cannot exceed balance GHS "+Number(current.balance).toFixed(2));
+  if(!email.includes("@")) return alert("Enter valid email");
+  const PAYSTACK_KEY = "pk_test_xxxxxxxxxxxxxxxxxxxxxxx";
+  if(PAYSTACK_KEY.includes("xxxx")){ doPaymentSuccess(amt, "BPA-TEST-"+Date.now(), email); return; }
+  let handler = PaystackPop.setup({ key: PAYSTACK_KEY, email: email, amount: amt*100, currency: "GHS", ref: "BPA_"+Date.now(), metadata:{ custom_fields: [{display_name:"Student ID", variable_name:"student_id", value:current.id}] }, callback: function(res){ doPaymentSuccess(amt, res.reference, email) }, onClose: function(){ alert("Payment closed") } }); handler.openIframe();
+}
+function doPaymentSuccess(amt, ref, email){
+  const s = students.find(x=>x.id===current.id);
+  s.paid = Number(s.paid)+amt; s.balance = Number(s.total)-Number(s.paid);
+  if(!s.payments) s.payments=[]; s.payments.push({amount:amt, method:selectedMethod, reference:ref, date:new Date().toISOString(), email:email});
+  saveDB(); current = s;
+  document.getElementById('receiptArea').innerHTML = `<div class="card" style="border:2px dashed var(--blue);margin-top:18px"><div style="text-align:center;border-bottom:1px dashed var(--border);padding-bottom:12px;margin-bottom:12px"><div style="font-weight:800;color:var(--blue-dark)">BENIM PREPARATORY ACADEMY</div><div style="font-size:11px;color:var(--muted)">OFFICIAL RECEIPT</div></div><div style="font-size:13px;line-height:2"><div style="display:flex;justify-content:space-between"><span>Student:</span><b>${s.name}</b></div><div style="display:flex;justify-content:space-between"><span>ID / Class:</span><b>${s.id} / ${s.class}</b></div><div style="display:flex;justify-content:space-between"><span>Amount Paid:</span><b style="color:var(--green)">GHS ${amt.toFixed(2)}</b></div><div style="display:flex;justify-content:space-between"><span>Method:</span><b>${selectedMethod}</b></div><div style="display:flex;justify-content:space-between"><span>Reference:</span><b>${ref}</b></div><div style="display:flex;justify-content:space-between"><span>Date:</span><b>${new Date().toLocaleString()}</b></div><div style="display:flex;justify-content:space-between;margin-top:10px;font-size:16px;font-weight:800;border-top:1px solid var(--border);padding-top:10px"><span>Balance Left:</span><b style="color:#dc2626">GHS ${Number(s.balance).toFixed(2)}</b></div></div><button class="btn btn-primary" style="margin-top:16px" onclick="window.print()">Print / Save PDF</button></div>`;
+  lookup(current.id); window.scrollTo({top:0, behavior:'smooth'});
+}
+function viewHistory(){
+  const s = current; if(!s.payments || s.payments.length===0){ document.getElementById('history').innerHTML = "<p style='text-align:center;color:var(--muted);padding:16px;font-size:13px'>No payments yet</p>"; return; }
+  let html = "<div style='margin-top:16px'><h4 style='font-size:13px;margin-bottom:8px'>Payment History</h4>";
+  s.payments.slice().reverse().forEach(p=>{ html+=`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px"><span>${new Date(p.date).toLocaleDateString()} - ${p.reference}</span><b style="color:var(--green)">GHS ${Number(p.amount).toFixed(2)}</b></div>`; }); html+="</div>"; document.getElementById('history').innerHTML=html;
+}
+window.addEventListener('DOMContentLoaded', ()=>{
+  const idFromUrl = getIdFromUrl(); if(idFromUrl){ document.getElementById('studentID').value = idFromUrl; lookup(idFromUrl); }
+});
+</script>
+</body>
+</html>
